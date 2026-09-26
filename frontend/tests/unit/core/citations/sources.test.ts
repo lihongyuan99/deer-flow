@@ -161,6 +161,86 @@ describe("extractCitationSources", () => {
     expect(extractCitationSources(markdown)).toEqual([]);
   });
 
+  it("ends an inline span at a heading, thematic break or list marker", () => {
+    // CommonMark ends the paragraph at these block boundaries too, so "Use
+    // `npm" cannot steal the opener of `npm start` two lines later and the
+    // citation between them is a rendered link, not sample code.
+    for (const boundary of ["## Title", "---", "- item"]) {
+      const markdown = [
+        "Use `npm",
+        boundary,
+        "See [citation:X](https://example.com/x) and `npm start`.",
+      ].join("\n");
+
+      expect(extractCitationSources(markdown).map((s) => s.url)).toEqual([
+        "https://example.com/x",
+      ]);
+    }
+  });
+
+  it("ends an inline span at a blank line inside a blockquote", () => {
+    const markdown = [
+      "> Install it with `npm i",
+      ">",
+      "> The guide is [citation:Docs](https://example.com/docs) and `npm start`.",
+    ].join("\n");
+
+    expect(extractCitationSources(markdown).map((s) => s.url)).toEqual([
+      "https://example.com/docs",
+    ]);
+  });
+
+  it("masks citations inside a fenced block nested in a list item", () => {
+    // The fence is indented past the list marker, so recognising it needs the
+    // container prefix; the blank line inside keeps it open across paragraphs.
+    const markdown = [
+      "- run:",
+      "    ```md",
+      "    [citation:Fake1](https://example.com/fake1)",
+      "",
+      "    [citation:Fake2](https://example.com/fake2)",
+      "    ```",
+      "",
+      "Real [citation:Real](https://example.com/real).",
+    ].join("\n");
+
+    expect(extractCitationSources(markdown).map((s) => s.url)).toEqual([
+      "https://example.com/real",
+    ]);
+  });
+
+  it("masks citations inside a blockquoted fence that contains a blank line", () => {
+    const markdown = [
+      "> ```md",
+      "> [citation:Fake1](https://example.com/fake1)",
+      "",
+      "> [citation:Fake2](https://example.com/fake2)",
+      "> ```",
+      "",
+      "Real [citation:Real](https://example.com/real).",
+    ].join("\n");
+
+    expect(extractCitationSources(markdown).map((s) => s.url)).toEqual([
+      "https://example.com/real",
+    ]);
+  });
+
+  it("keeps a fence open across a shorter backtick run inside it", () => {
+    const markdown = [
+      "````md",
+      "```",
+      "[citation:Inside](https://example.com/inside)",
+      "```",
+      "````",
+      "",
+      "Outside [citation:Outside](https://example.com/outside).",
+    ].join("\n");
+
+    expect(extractCitationSources(markdown).map((s) => s.url)).toEqual([
+      "https://example.com/outside",
+    ]);
+  });
+
   it("uses the source domain when the citation label is generic", () => {
     const markdown = "See [citation:Source](https://www.example.com/path).";
 
