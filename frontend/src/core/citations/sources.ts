@@ -104,10 +104,13 @@ export function maskCitationCode(markdown: string): string {
 }
 
 // A fence can be nested in a list item or a blockquote, so its marker may sit
-// behind container prefixes and any indentation there. Only the column-0 shape
-// was recognised before, and indented fences were blanked by accident because
-// whole-document backtick pairing happened to close them.
-const FENCE_LINE_RE = /(?:(?:[ \t]*>)|[-+*]|\d{1,9}[.)]|[ \t])*(`{3,}|~{3,})/;
+// behind container prefixes and the indentation a container gives it. Only the
+// column-0 shape was recognised before, and indented fences were blanked by
+// accident because whole-document backtick pairing happened to close them.
+// Anchored: a backtick run further into a line is inline code, not an opener.
+const FENCE_LINE_RE =
+  /^((?:(?:[ \t]*>)|[-+*]|\d{1,9}[.)]|[ \t])*)(`{3,}|~{3,})/;
+const BLOCKQUOTE_LINE_RE = /^[ \t]*>/;
 
 // Inline spans end at a block boundary, not just at a blank line: see
 // `inlineSpanStarts` for the shapes and the matching scanner in
@@ -120,31 +123,60 @@ const INTERRUPTING_LIST_RE = /^(?:[ \t]*>)*[ \t]{0,3}(?:[-+*]|1[.)])[ \t]+\S/;
 
 const INLINE_CODE_SPAN_RE = /(`+)[\s\S]*?\1/g;
 
+function indentationColumns(text: string): number {
+  let column = 0;
+  for (const char of text) {
+    if (char !== " " && char !== "\t") {
+      break;
+    }
+    column += char === "\t" ? 4 - (column % 4) : 1;
+  }
+  return column;
+}
+
 function maskFencedCodeBlocks(markdown: string): string {
   // Blank a fenced block from its opener to its matching closer — or, while the
   // message is still streaming, to end of input when the fence is unclosed.
   // Marker-aware like the shared FENCE_MARKER_RE: a closer must repeat the
   // opener character and be at least as long, so a shorter run inside the block
-  // does not close it early.
+  // does not close it early. A fence also cannot outlive the container it was
+  // opened in, which is what `container` tracks (blank lines never end one,
+  // since a fenced block keeps them, but a blockquote loses its fence as soon
+  // as a line drops the `>` marker).
   const lines = markdown.split("\n");
   let openMarker: string | null = null;
+  let container: { quoted: boolean; columns: number } | null = null;
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i]!;
-    const marker = FENCE_LINE_RE.exec(line)?.[1] ?? null;
-    if (openMarker === null) {
-      if (marker) {
-        openMarker = marker;
+    const fence = FENCE_LINE_RE.exec(line);
+    if (openMarker) {
+      const escaped = container!.quoted
+        ? !BLOCKQUOTE_LINE_RE.test(line)
+        : line.trim() !== "" && indentationColumns(line) < container!.columns;
+      if (escaped) {
+        openMarker = null;
+        container = null;
+      } else {
         lines[i] = maskKeepingNewlines(line);
+        const marker = fence?.[2];
+        if (
+          marker &&
+          marker.startsWith(openMarker.charAt(0)) &&
+          marker.length >= openMarker.length
+        ) {
+          openMarker = null;
+          container = null;
+        }
+        continue;
       }
-      continue;
     }
-    lines[i] = maskKeepingNewlines(line);
-    if (
-      marker &&
-      marker.startsWith(openMarker.charAt(0)) &&
-      marker.length >= openMarker.length
-    ) {
-      openMarker = null;
+    if (fence) {
+      openMarker = fence[2]!;
+      container = {
+        quoted: fence[1]!.includes(">"),
+        columns: indentationColumns(fence[1]!),
+      };
+      lines[i] = maskKeepingNewlines(line);
     }
   }
   return lines.join("\n");

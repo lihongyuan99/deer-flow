@@ -209,7 +209,10 @@ describe("extractCitationSources", () => {
     ]);
   });
 
-  it("masks citations inside a blockquoted fence that contains a blank line", () => {
+  it("masks a blockquoted fence, and stops at the line that ends the quote", () => {
+    // Fake1 is inside the fence. The blank line has no `>` marker, so it closes
+    // the blockquote — and the fence with it — which makes Fake2 a rendered link
+    // again. Verified against remark-parse rather than by eye.
     const markdown = [
       "> ```md",
       "> [citation:Fake1](https://example.com/fake1)",
@@ -218,6 +221,18 @@ describe("extractCitationSources", () => {
       "> ```",
       "",
       "Real [citation:Real](https://example.com/real).",
+    ].join("\n");
+
+    expect(extractCitationSources(markdown).map((s) => s.url)).toEqual([
+      "https://example.com/fake2",
+      "https://example.com/real",
+    ]);
+  });
+
+  it("does not open a fence from a backtick run in the middle of a line", () => {
+    const markdown = [
+      "Run ```md please",
+      "[citation:Real](https://example.com/real).",
     ].join("\n");
 
     expect(extractCitationSources(markdown).map((s) => s.url)).toEqual([
