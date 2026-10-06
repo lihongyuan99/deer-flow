@@ -817,8 +817,18 @@ def _scan_shell(rel_path: str, text: str) -> list[SecurityFinding]:
         # (exponential) before the non-shell tail fails. The lookahead keeps
         # the two branches mutually exclusive, so each token is consumed in
         # exactly one way and a failing chain stays linear.
-        r"|-(?![acCDghprRtTuU]\b)\S+(?:\s|\\\r?\n)+)*?)?(?:/usr/(?:local/)?bin/|/bin/)?"
-        r"(?:bash|zsh|dash|fish|sh)\b",
+        r"|-(?![acCDghprRtTuU]\b)\S+(?:\s|\\\r?\n)+)*?)?"
+        # A PATH selector or a busybox multiplexer runs whatever interpreter it
+        # is handed, so the token between the pipe and the shell must not break
+        # the chain: `| /usr/bin/env bash` and `| busybox sh` execute the
+        # download exactly like `| bash`. This list is hand-maintained like the
+        # sudo option class above, and every entry starts with a distinct
+        # character so a failing chain keeps one exit point per repetition.
+        r"(?:(?:/usr/(?:local/)?bin/|/bin/)?(?:env|busybox)(?:\s|\\\r?\n)+)*"
+        # The shells below are those that read commands from standard input when
+        # invoked with no file argument; a name missing here is a silent miss.
+        r"(?:/usr/(?:local/)?bin/|/bin/)?"
+        r"(?:bash|zsh|dash|fish|ksh|tcsh|csh|ash|sh)\b",
         text,
     ):
         findings.append(_finding_from_match("shell-curl-pipe-shell", rel_path, text, match))
