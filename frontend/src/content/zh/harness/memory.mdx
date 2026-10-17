@@ -261,7 +261,7 @@ memory:
 DeerFlow 按用户分记忆文件，按 Agent 分事实目录：
 
 - **用户全局记忆**：`{base_dir}/users/{user_id}/memory.json`，存放该用户跨任务的摘要。`agent_name` 不会切换到另一个记忆文件。
-- **按 Agent 事实**：`{base_dir}/users/{user_id}/agents/{agent_name}/facts/`，与同一用户的记忆文件并列存放，使各 Agent 学到的事实相互独立。
+- **按 Agent 事实**：`{base_dir}/users/{user_id}/agents/{agent_name}/facts/`，与同一用户的记忆文件并列存放，使各 Agent 学到的事实相互独立。`{agent_name}` 这段会被转为小写，且仅允许 `A-Z`、`a-z`、`0-9` 和 `-`。
 
 （不带 `user_id` 的旧调用会落到未分用户的遗留根 `{base_dir}/memory.json`，见 `deermem/core/paths.py` 的 `Legacy: no user_id` 分支。）
 
