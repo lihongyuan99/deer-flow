@@ -298,7 +298,7 @@ guide.
 DeerFlow scopes memory files per user and facts per agent:
 
 - **Per-user memory**: `{base_dir}/users/{user_id}/memory.json` holds that user's cross-task summary. `agent_name` does not select a different memory file.
-- **Per-agent facts**: `{base_dir}/users/{user_id}/agents/{agent_name}/facts/` sits next to the same user's memory file, keeping one agent's learned facts separate from another's.
+- **Per-agent facts**: `{base_dir}/users/{user_id}/agents/{agent_name}/facts/` sits next to the same user's memory file, keeping one agent's learned facts separate from another's. The `{agent_name}` segment is lowercased, and names are restricted to `A-Z`, `a-z`, `0-9` and `-`.
 
 (A caller with no `user_id` falls back to the unscoped legacy root `{base_dir}/memory.json` — see the `Legacy: no user_id` branch in `deermem/core/paths.py`.)
 
